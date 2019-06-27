@@ -69,11 +69,7 @@ export async function arePushNotificationsEnabled(): Promise<boolean> {
   /**
    * Do browser feature detection first
    */
-  if (
-    !supportsNotifications ||
-    !supportsPushManager ||
-    !supportsServiceWorkers
-  ) {
+  if (!supportsNotifications || !supportsPushManager) {
     return false;
   }
   /**
@@ -97,7 +93,7 @@ export async function arePushNotificationsEnabled(): Promise<boolean> {
 }
 
 export async function subscribe(): Promise<boolean> {
-  if (!supportsServiceWorkers || !supportsPushManager) {
+  if (!supportsPushManager) {
     return false;
   }
 
@@ -120,7 +116,7 @@ export async function subscribe(): Promise<boolean> {
 }
 
 export async function unsubscribe(): Promise<boolean> {
-  if (!supportsServiceWorkers || !supportsPushManager) {
+  if (!supportsPushManager) {
     return false;
   }
 

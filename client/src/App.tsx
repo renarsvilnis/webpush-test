@@ -20,12 +20,6 @@ import {
 } from "./push-notifications";
 
 (async () => {
-  const supportsIndexDB = await isIndexDBSupported();
-  console.log({ supportsIndexDB });
-
-  const supportsIndexDB2 = await isIndexDBSupported();
-  console.log({ supportsIndexDB });
-
   await setCredentials("test-accesstoken", Date.now().toString());
 
   const credentials = await getCredentials();

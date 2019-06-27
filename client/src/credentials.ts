@@ -75,7 +75,7 @@ export function setCredentials(
   refreshToken: string
 ): Promise<void> {
   return new Promise(async (resolve, reject) => {
-    // Fallback for firefox in incognito mode
+    // Fallback for firefox in incognito mode as it doesn't support IndexDB
     const supportsIndexDB = await isIndexDBSupported();
     if (!supportsIndexDB) {
       localStorage.setItem("accessToken", accessToken);
@@ -102,7 +102,7 @@ export function setCredentials(
 
 export function getCredentials(): Promise<Credentials> {
   return new Promise(async (resolve, reject) => {
-    // Fallback for firefox in incognito mode
+    // Fallback for firefox in incognito mode as it doesn't support IndexDB
     const supportsIndexDB = await isIndexDBSupported();
     if (!supportsIndexDB) {
       resolve({
@@ -133,7 +133,7 @@ export function getCredentials(): Promise<Credentials> {
 
 export function clearCredentials() {
   return new Promise(async (resolve, reject) => {
-    // Fallback for firefox in incognito mode
+    // Fallback for firefox in incognito mode as it doesn't support IndexDB
     const supportsIndexDB = await isIndexDBSupported();
     if (!supportsIndexDB) {
       localStorage.removeItem("accessToken");

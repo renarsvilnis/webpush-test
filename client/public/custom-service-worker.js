@@ -1,107 +1,221 @@
+/* eslint-disable no-restricted-globals */
 /* eslint-env serviceworker */
 
-// self.addEventListener('push', (ev) => {
-//  // Work until promise inside is resolved
-//   ev.waitUntil(() => {
-//     self.registration.showNotification('Title', {
-//       body: "I'm the message body",
-//       icon: 'images/potato.jpeg',
-//       tag: 'tag',
-//       actions: [
-//         {action: 'like', title: 'Like', icon: '...'},
-//         {action: 'reshare', title: 'Reshare', icon: '...'}
-//       ]
-//     })
-//   })
-// })
-
-// self.registration.showNotification("Title", {
-//   body: "I'm the message body",
-//   icon: "images/potato.jpeg",
-//   tag: "tag",
-//   actions: [
-//     {
-//       action: "like",
-//       title: "Like"
-//       // icon: "..."
-//     },
-//     {
-//       action: "reshare",
-//       title: "Reshare"
-//       // icon: "..."
-//     }
-//   ]
-// });
-
-// {"title": "Test", "body": "Hello world", "tag": "tag"}
 self.addEventListener("push", ev => {
-  if (!ev.data) {
-    return;
-  }
+  ev.waitUntil(
+    (async () => {
+      /**
+       * As we send all required info inside of the push notification exit early
+       * if it isn't present
+       */
+      if (!ev.data) {
+        return;
+      }
 
-  let data;
-  try {
-    data = ev.data.json();
-  } catch {
-    return;
-  }
+      let data;
+      try {
+        data = ev.data.json();
+      } catch {
+        return;
+      }
 
-  // https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerRegistration/showNotification
-  // https://stackoverflow.com/a/44025413
-  self.registration.showNotification(data.title, {
-    body: data.body,
-    icon: data.icon,
-    // group messages for upvotes ett
-    tag: data.tag,
-    data: {
-      url: data.url
-    }
-  });
+      // Doc: https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerRegistration/showNotification
+      await self.registration.showNotification(data.title, {
+        // lang: 'en
+        body: data.body,
+        icon: data.icon,
+        // group messages for upvotes ett
+        // An ID for a given notification that allows you to find, replace, or remove the notification using a script if necessary.
+        // tag: data.tag,
+        tag: data.tag,
+
+        data: {
+          // TODO: Maybe add unique id?
+          // id: data.id
+          url: data.url
+        }
+      });
+    })()
+  );
 });
 
-// const backend = {
-//   regiister () {
+setInterval(async () => {
+  const credentials = await getCredentials();
+  console.log("Service worker read credentials:", credentials);
+}, 5000);
 
-//   }
-// }
+async function subscribe(pushSubscription) {
+  // TODO: send request to backend
+  // pushSubscription.toJSON()
+}
 
-// https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerGlobalScope/pushsubscriptionchange_event
+/**
+ * Trigged when there is a change in push subscription that was triggered
+ * outside the application's control. This may occur if the subscription was
+ * refreshed by the browser, but it may also happen if the subscription has been
+ * revoked or lost.
+ *
+ * Docs: https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerGlobalScope/pushsubscriptionchange_event
+ */
 self.addEventListener("pushsubscriptionchange", ev => {
-  // remove the entry from DB
-  console.debug("pushsubscriptionchange");
-  // ev.waitUntil(async () => {
-  //   const subscription = await self.registration.pushManager.subscribe(ev.oldSubscription.options);
-  // });
+  console.log("pushsubscriptionchange", ev.oldSubscription, ev);
+
+  // https://stackoverflow.com/questions/36602136/how-can-i-test-pushsubscriptionchange-event-handling-code
+
+  ev.waitUntil(
+    (async () => {
+      try {
+        const pushSubscription = await self.registration.pushManager.subscribe(
+          ev.oldSubscription.options
+        );
+        await subscribe(pushSubscription);
+      } catch {
+        return;
+      }
+    })()
+  );
 });
 
-// https://medium.com/founding-ithaka/implementing-push-notifications-with-create-react-app-bf35cd25d870
+/**
+ * Triggered when clicking the "close" button of the notification
+ */
 self.addEventListener("notificationclose", ev => {
-  const notification = ev.notification;
-  const data = notification.data || {};
-  const primaryKey = data.primaryKey;
-  console.debug("Closed notification: " + primaryKey);
+  console.log("Closed notification");
 
+  // const data = ev.notification.data;
   // Alternative: https://youtu.be/_dXBibRO0SM?t=2066
-  // event.waitUntil(fethc('/api/close-notif?id=' + data.id))
+  // event.waitUntil(fetch('/api/close-notif?id=' + data.id))
 });
 
+const addTrailingSlashIfNeeded = url => `${url}${url.endsWith("/") ? "" : "/"}`;
+
+/**
+ * Triggered when clicking on the notification body or any of it's custom actions
+ */
 self.addEventListener("notificationclick", ev => {
-  const data = ev.notification.data || {};
-  const primaryKey = data.primaryKey;
-  const action = ev.action;
+  ev.waitUntil(
+    (async () => {
+      ev.notification.close();
 
-  // if (action === 'like') {
-  //   event.waitUntil(fetch('...'))
-  // } ...
-  console.debug("Clicked notification: " + primaryKey);
-  if (action === "close") {
-    console.debug("Notification clicked and closed", primaryKey);
-    ev.notification.close();
-  } else {
-    console.debug("Notification actioned", primaryKey);
-    const url = data.url || "/";
-    ev.notification.close();
-    clients.openWindow(url);
-    // clients.openWindow(ev.srcElement.location.origin);
-  }
+      /**
+       * Find all opened windows "tabs" of the site, must also include the
+       * uncontrolled ones as otherwise if user has only one "tab" and it
+       * initializes the service worker it won't be included in the matchAll() response.
+       * Source: https://stackoverflow.com/a/35108844
+       * Docs: https://developer.mozilla.org/en-US/docs/Web/API/Clients/openWindow#Examples
+       */
+      const clientsArr = await clients.matchAll({
+        includeUncontrolled: true,
+        type: "window"
+      });
+
+      /**
+       * Need to add a trailing slash as clients.matchAll() result client.url
+       * properties contain url with a trailing slash
+       */
+      const urlToVisit = addTrailingSlashIfNeeded(
+        (ev.notification.data && ev.notification.data.url) ||
+          ev.srcElement.location.origin
+      );
+
+      /**
+       * clients.matchAll() returns clients in most recently focused order,
+       * correct as per spec so stop looping at first match.
+       */
+      let foundClient;
+      for (let i = 0, l = clientsArr.length; i < l; i++) {
+        if (clientsArr[i].url === urlToVisit) {
+          foundClient = clientsArr[i];
+          break;
+        }
+      }
+
+      if (foundClient) {
+        // We already have a window to use, focus it.
+        foundClient.postMessage({
+          type: "PUSH_NOTIFICATION",
+          url: urlToVisit
+        });
+        foundClient.focus();
+      } else {
+        // Create a new window.
+        await clients.openWindow(urlToVisit);
+      }
+    })()
+  );
 });
+
+self.addEventListener("message", messageEvent => {
+  console.log("Service Worker recieved message:", messageEvent);
+});
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+const DB_NAME = "community";
+const DB_VERSION = 1;
+
+const ACCESS_TOKEN_STORE_NAME = "credentials";
+
+// Cached connection instance
+let cachedDb;
+
+function getDatabase() {
+  return new Promise((resolve, reject) => {
+    if (cachedDb) {
+      resolve(cachedDb);
+      return;
+    }
+
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    // https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase
+    request.onupgradeneeded = ev => {
+      const db = request.result;
+
+      // Version 1 is the first version of the database.
+      if (ev.oldVersion < 1) {
+        db.createObjectStore(ACCESS_TOKEN_STORE_NAME);
+      }
+      // Other migrations go here
+    };
+
+    request.onerror = ev => {
+      reject(request.error);
+    };
+
+    request.onsuccess = ev => {
+      cachedDb = request.result;
+
+      cachedDb.onclose = () => {
+        cachedDb = undefined;
+      };
+
+      resolve(cachedDb);
+    };
+  });
+}
+
+function getCredentials() {
+  return new Promise(async (resolve, reject) => {
+    const db = await getDatabase();
+    const transaction = db.transaction([ACCESS_TOKEN_STORE_NAME], "readonly");
+    const objectStore = transaction.objectStore(ACCESS_TOKEN_STORE_NAME);
+    const request = objectStore.getAll();
+
+    transaction.onerror = ev => {
+      reject(transaction.error);
+    };
+    transaction.oncomplete = ev => {
+      const results = request.result;
+      resolve({
+        accessToken: results[0],
+        refreshToken: results[1]
+      });
+    };
+  });
+}

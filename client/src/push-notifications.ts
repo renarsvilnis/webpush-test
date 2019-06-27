@@ -1,19 +1,29 @@
 import axios from "axios";
 
-// TODO: Import as environmental
+// TODO: make it as environmental
 const PUBLIC_VAPID_KEY =
   "BMDPcR5Boiz87Q4ia9X26DH_uRmQDVvxzk6LxaKu30mTP2ZWKCtWjp2c5XYWTKxIHwaWhQ2rf9SMQARtDfeP9GE";
 
 const pushNotificationOptions = {
-  // If we send notifications,we must show something
+  /**
+   * Symbolic agreement with the browser that the web app will show a notification every time a push is received
+   * Always true
+   */
   userVisibleOnly: true,
   applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY)
 };
 
 // https://developers.google.com/web/fundamentals/push-notifications/subscribing-a-user
 export const supportsServiceWorkers = "serviceWorker" in navigator;
-export const supportsPushManager = "PushManager" in window;
+/**
+ * Firefox in incognito  doesn't support service worker but it as PushManager.
+ * So in order to validate actual support service worker must be supported
+ */
+export const supportsPushManager =
+  supportsServiceWorkers && "PushManager" in window;
 export const supportsNotifications = "Notification" in window;
+export const canEnablePushNotifications =
+  supportsPushManager && Notification.permission !== "denied";
 
 /**
  * https://github.com/web-push-libs/web-push#using-vapid-key-for-applicationserverkey
@@ -29,6 +39,30 @@ function urlBase64ToUint8Array(base64String: string) {
     outputArray[i] = rawData.charCodeAt(i);
   }
   return outputArray;
+}
+
+async function apiSubscribeToPushNotifications(
+  pushSubscription: PushSubscription
+): Promise<boolean> {
+  const res = await axios.post(
+    "http://localhost:3000/push-notifications/subscribe",
+    pushSubscription.toJSON()
+  );
+
+  // TODO: check actual backend stuff
+  return res.status === 201;
+}
+
+async function apiUnsubscribeToPushNotifications(
+  pushSubscription: PushSubscription
+): Promise<boolean> {
+  const res = await axios.post(
+    "/push-notifications/unsubscribe",
+    pushSubscription.toJSON()
+  );
+
+  // TODO: check actual backend stuff
+  return res.status === 201;
 }
 
 export async function arePushNotificationsEnabled(): Promise<boolean> {
@@ -67,46 +101,22 @@ export async function subscribe(): Promise<boolean> {
     return false;
   }
 
-  console.log(
-    "Notification Permission Before request:",
-    Notification.permission
-  );
-
   const reg = await navigator.serviceWorker.getRegistration();
 
-  if (reg && reg.pushManager) {
-    // https://developer.mozilla.org/en-US/docs/Web/API/PushManager/subscribe
-    let subscription: PushSubscription | undefined;
-
-    try {
-      subscription = await reg.pushManager.subscribe(pushNotificationOptions);
-      console.log({subscription});
-      
-    } catch (err) {
-      if (Notification.permission === "denied") {
-        console.info("Permission for notifications was denied");
-      } else {
-        console.info("Unable to subscribe to push", err);
-      }
-      return false;
-    }
-
-    console.log(
-      "Push subscription client side:",
-      subscription,
-      subscription.toJSON()
-    );
-
-    const res = await axios.post(
-      "http://localhost:3000/push-notifications/subscribe",
-      subscription.toJSON()
-    );
-    console.log("Backend response:", res.status);
-
-    return res.status === 201;
+  if (!reg || !reg.pushManager) {
+    return false;
   }
 
-  return false;
+  // https://developer.mozilla.org/en-US/docs/Web/API/PushManager/subscribe
+  let subscription: PushSubscription;
+
+  try {
+    subscription = await reg.pushManager.subscribe(pushNotificationOptions);
+  } catch (err) {
+    return false;
+  }
+
+  return await apiSubscribeToPushNotifications(subscription);
 }
 
 export async function unsubscribe(): Promise<boolean> {
@@ -114,20 +124,35 @@ export async function unsubscribe(): Promise<boolean> {
     return false;
   }
 
+  // https://stackoverflow.com/a/28805951
   const reg = await navigator.serviceWorker.getRegistration();
-  if (reg && reg.pushManager) {
-    const subscription = await reg.pushManager.getSubscription();
-    if (subscription) {
-      const unsubscribed = await subscription.unsubscribe();
-      await axios.post("/push-notifications/unsubscribe");
-      // TODO: call backend
-      console.log("Unsubscribe Results:", unsubscribed);
-      return unsubscribed;
-    } else {
-      console.log("Nothing to unsubscribe to");
-      return false;
-    }
+  if (!reg || !reg.pushManager) {
+    return false;
   }
 
-  return false;
+  const subscription = await reg.pushManager.getSubscription();
+  if (!subscription) {
+    return false;
+  }
+
+  let unsubscribed: boolean;
+
+  try {
+    unsubscribed = await subscription.unsubscribe();
+  } catch {
+    unsubscribed = false;
+  }
+
+  if (!unsubscribed) {
+    return false;
+  }
+
+  // TEMP: Example Sent message to service worker
+  if (navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage(
+      "Hello service worker, this is website!"
+    );
+  }
+
+  return await apiUnsubscribeToPushNotifications(subscription);
 }

@@ -1,35 +1,30 @@
 import Redis from "ioredis";
+import webpush, { PushSubscription } from "web-push";
 
 const redis = new Redis();
 
 const REDIS_KEY = "user-push-data";
 
-// TODO: make enviromnmentals
 /**
  * This must be either a URL or a 'mailto:' address. For example:
  * 'https://my-site.com/contact' or 'mailto: contact
- */ 
-export const vapidSubject = "mailto:community-support@ubnt.com";
+ */
+const vapidSubject = "https://community.ui.com";
+
 /**
  * Keys from "npm run helper:generate-vapid-keys" command
  */
-export const publicVapidKey =
+// TODO: make enviromnmentals
+const publicVapidKey =
   "BMDPcR5Boiz87Q4ia9X26DH_uRmQDVvxzk6LxaKu30mTP2ZWKCtWjp2c5XYWTKxIHwaWhQ2rf9SMQARtDfeP9GE";
-export const privateVapidKey = "KnTLz8GtFJWHF3VCEJkiy1iJnD1gKEldyt2JDIDv7dM";
+const privateVapidKey = "KnTLz8GtFJWHF3VCEJkiy1iJnD1gKEldyt2JDIDv7dM";
 
-type USVString = string;
-export interface PushSubscription {
-  endpoint: USVString;
-  expirationTime?: DOMHighResTimeStamp;
-  keys: {
-    auth: string;
-    p256dh: string;
-  };
-}
+webpush.setVapidDetails(vapidSubject, publicVapidKey, privateVapidKey);
 
-export function isValidSubscription(body: any) {
-  // TODO: implement
-  return true;
+export function isValidSubscription(body: any): boolean {
+  return (
+    !!body.endpoint && !!body.keys && !!body.keys.p256dh && !!body.keys.auth
+  );
 }
 
 export async function saveSubscription(subscription: PushSubscription) {
@@ -44,7 +39,7 @@ export async function getSubscription() {
   }
 }
 
-export async function removeSubcription () {
+export async function removeSubcription() {
   const rowsRemoved = await redis.del(REDIS_KEY);
   return rowsRemoved === 1;
 }

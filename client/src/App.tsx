@@ -3,19 +3,51 @@ import "./App.css";
 import axios from "axios";
 
 import {
+  isIndexDBSupported,
+  setCredentials,
+  getCredentials,
+  clearCredentials
+} from "./credentials";
+
+import {
   arePushNotificationsEnabled,
   supportsServiceWorkers,
   supportsPushManager,
   supportsNotifications,
   unsubscribe,
-  subscribe
+  subscribe,
+  canEnablePushNotifications
 } from "./push-notifications";
+
+(async () => {
+  const supportsIndexDB = await isIndexDBSupported();
+  console.log({ supportsIndexDB });
+
+  const supportsIndexDB2 = await isIndexDBSupported();
+  console.log({ supportsIndexDB });
+
+  await setCredentials("test-accesstoken", Date.now().toString());
+
+  const credentials = await getCredentials();
+  console.log({ credentials });
+
+  await clearCredentials();
+
+  const credentialsAfter = await getCredentials();
+  console.log({ credentialsAfter });
+
+  await setCredentials("test-accesstoken-asfter", Date.now().toString());
+})();
 
 const notificationExamples = [
   {
     title: "When someone comments on my question",
     notification: {
-      title: 'New comment on "UniFi Login Open on Public Facing IP"'
+      title: 'New comment on "UniFi Login Open on Public Facing IP"',
+      body:
+        '@ferganavalley wrote "Maybe try to do somehing else than flashing"',
+      url:
+        "https://community.ui.com/stories/Replacing-a-34dBi-AirFiber-Dish-with-a-MonsterDish/3f9a63ad-edd2-4465-98e9-4ac1cf94b6fd#comment/2519fcf2-b6c7-4d77-8828-02f1cb8241c1"
     }
   },
   { title: "When someone upvotes my question", notification: {} },
@@ -33,6 +65,7 @@ const notificationExamples = [
     notification: {
       title: "New Message from @ferganavalley",
       url: "https://community.ui.com/messages"
+      // icon: 'icons/potato.jpeg'
     }
     // notification: { title: "@ferganavalley sent you message" }
   }
@@ -40,16 +73,19 @@ const notificationExamples = [
 
 const App: React.FC = () => {
   const [loadingStatus, setLoadingStatus] = useState(true);
+  const [indexDbSupported, setIndexDbSupported] = useState(true);
   const [pushNotificationsEnabled, setPushNotificationsEnabled] = useState(
     false
   );
 
   useEffect(() => {
-    arePushNotificationsEnabled().then(enabled => {
-      console.log({ enabled });
-      setLoadingStatus(false);
-      setPushNotificationsEnabled(enabled);
-    });
+    Promise.all([arePushNotificationsEnabled(), isIndexDBSupported()]).then(
+      ([pushNotificationsEnabled, indexDbSuported]) => {
+        setLoadingStatus(false);
+        setPushNotificationsEnabled(pushNotificationsEnabled);
+        setIndexDbSupported(indexDbSuported);
+      }
+    );
   }, []);
 
   // TODO: add check if "blocked", do custom emssage to show user how to change
@@ -66,12 +102,22 @@ const App: React.FC = () => {
       <p>{`Push notifications supported: ${
         loadingStatus ? "?" : supportsPushManager ? "✔" : "╳"
       }`}</p>
+      <p>{`Can prompt to show notifications: ${
+        loadingStatus ? "?" : canEnablePushNotifications ? "✔" : "╳"
+      }`}</p>
       <p>{`Push notifications enabled: ${
         loadingStatus ? "?" : pushNotificationsEnabled ? "✔" : "╳"
       }`}</p>
+      <p>{`Supports IndexDB: ${
+        loadingStatus ? "?" : indexDbSupported ? "✔" : "╳"
+      }`}</p>
       <p>
         <button
-          disabled={!supportsPushManager || pushNotificationsEnabled}
+          disabled={
+            !canEnablePushNotifications ||
+            !supportsPushManager ||
+            pushNotificationsEnabled
+          }
           onClick={async () => {
             const success = await subscribe();
             if (success) {
@@ -82,7 +128,11 @@ const App: React.FC = () => {
           Subscribe to Push notifications
         </button>
         <button
-          disabled={!supportsPushManager || !pushNotificationsEnabled}
+          disabled={
+            !canEnablePushNotifications ||
+            !supportsPushManager ||
+            !pushNotificationsEnabled
+          }
           onClick={async () => {
             const success = await unsubscribe();
             if (success) {
@@ -94,7 +144,7 @@ const App: React.FC = () => {
         </button>
       </p>
 
-      <h2>Example notifications</h2>
+      <h2>Example Push Notifications</h2>
       {notificationExamples.map((example, i) => {
         return (
           <p key={i}>

@@ -1,21 +1,14 @@
 import { Request, Response, default as express } from "express";
 import morgan from "morgan";
 import bodyParser from "body-parser";
-import webpush from "web-push";
-import path from "path";
+import webpush, { PushSubscription } from "web-push";
 
 import {
-  PushSubscription,
   isValidSubscription,
   saveSubscription,
   getSubscription,
-  removeSubcription,
-  vapidSubject,
-  publicVapidKey,
-  privateVapidKey
+  removeSubcription
 } from "./push-notifications";
-
-webpush.setVapidDetails(vapidSubject, publicVapidKey, privateVapidKey);
 
 const app = express();
 
@@ -27,25 +20,9 @@ app.get("/", (req: Request, res: Response) => {
   res.send("Hello World");
 });
 
-// setInterval(async () => {
-//   const subscription = await getSubscription();
-
-//   if (!subscription) {
-//     console.log("Push notifications not enabled!");
-//     return;
-//   }
-
-//   const payload  = JSON.stringify({
-//     title: 'Hello world'
-//   })
-//   await webpush.sendNotification(subscription, payload);
-
-//   // console.info("TODO: send notification", subscriptionData);
-// }, 10000);
-
 app.post("/push-notifications/subscribe", (req: Request, res: Response) => {
   if (!isValidSubscription(req.body)) {
-    res.sendStatus(400);
+    res.status(201).json({ data: { success: false } });
     return;
   }
 
@@ -57,10 +34,13 @@ app.post("/push-notifications/subscribe", (req: Request, res: Response) => {
   });
 });
 
-app.post('/push-notifications/unsubscribe', async (req: Request, res: Response) => {
-  const success = await removeSubcription();
-  res.json({data: {success}});
-})
+app.post(
+  "/push-notifications/unsubscribe",
+  async (req: Request, res: Response) => {
+    const success = await removeSubcription();
+    res.status(201).json({ data: { success } });
+  }
+);
 
 app.post("/push-notifications/test", async (req: Request, res: Response) => {
   const subscription = await getSubscription();
@@ -72,9 +52,21 @@ app.post("/push-notifications/test", async (req: Request, res: Response) => {
   }
 
   const payload = JSON.stringify(req.body);
-  await webpush.sendNotification(subscription, payload);
+  try {
+    await webpush.sendNotification(subscription, payload);
+  } catch (err) {
+    // HTTP 410 is returned when push subscription has unsubscribed or expired
+    if (err.statusCode === 410) {
+      await removeSubcription();
+      res.sendStatus(410);
+    } else {
+      console.error(err);
+      res.sendStatus(500);
+    }
+    return;
+  }
 
-  res.sendStatus(200)
+  res.sendStatus(201);
 });
 
 app.use((req: Request, res: Response) => {

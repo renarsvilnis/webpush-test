@@ -32,7 +32,6 @@ export function registerSw(config?: Config) {
 
     window.addEventListener("load", () => {
       // Override default service worker
-      // const swUrl = `${process.env.PUBLIC_URL}/service-worker.js`;
       const swUrl = `${process.env.PUBLIC_URL}/custom-service-worker.js`;
 
       if (isLocalhost) {
@@ -113,6 +112,12 @@ function registerValidSW(swUrl: string, config?: Config) {
           }
         };
       };
+
+      // Manul force service worker update every hour
+      // Enable only when needed!
+      // setTimeout(() => {
+      //   registration.update();
+      // }, 1000 * 60 * 60);
     })
     .catch(error => {
       console.error("Error during service worker registration:", error);

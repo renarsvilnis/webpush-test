@@ -20,15 +20,34 @@ export function isIndexDBSupported(): Promise<boolean> {
       return;
     }
 
-    const request = indexedDB.open("dummy", 1);
+    const dbName = "dummy-db-to-test-support";
+    const request = indexedDB.open(dbName, 1);
     request.onerror = ev => {
       supportsIndexDBCache = false;
       resolve(supportsIndexDBCache);
     };
 
     request.onsuccess = ev => {
-      supportsIndexDBCache = true;
-      resolve(supportsIndexDBCache);
+      /**
+       * Need to close the db connection before deleting the database otherwise
+       * will resolve in a long time
+       *
+       * Source: https://stackoverflow.com/a/35141818
+       */
+      const db = request.result;
+      db.close();
+
+      /**
+       * Cleanup stuff, but at this point ff was db able to open assume that
+       * IndexDB is supported and don't care if db deletion fails
+       */
+      const resolveInAnyCase = () => {
+        supportsIndexDBCache = true;
+        resolve(supportsIndexDBCache);
+      };
+      const deleteRequest = indexedDB.deleteDatabase(dbName);
+      deleteRequest.onerror = resolveInAnyCase;
+      deleteRequest.onsuccess = resolveInAnyCase;
     };
   });
 }

@@ -58,8 +58,8 @@ const notificationExamples = [
     title: "When someone sends me a message",
     notification: {
       title: "New Message from @ferganavalley",
-      url: "https://community.ui.com/messages"
-      // icon: 'icons/potato.jpeg'
+      url: "https://community.ui.com/messages",
+      icon: "https://developers.google.com/web/images/contributors/mco.jpg"
     }
     // notification: { title: "@ferganavalley sent you message" }
   }

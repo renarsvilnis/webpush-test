@@ -55,10 +55,21 @@ app.post("/push-notifications/test", async (req: Request, res: Response) => {
   try {
     await webpush.sendNotification(subscription, payload);
   } catch (err) {
-    // HTTP 410 is returned when push subscription has unsubscribed or expired
-    if (err.statusCode === 410) {
+    /**
+     * HTTP 404 - Not Found. This is an indication that the subscription is expired and can't be used. In this case you should delete the `PushSubscription` and wait for the client to resubscribe the user.
+     * HTTP 410 - Gone. The subscription is no longer valid and should be removed from application server. This can be reproduced by calling `unsubscribe()` on a `PushSubscription`.
+     * Source: https://developers.google.com/web/fundamentals/push-notifications/sending-messages-with-web-push-libraries#sending_push_messages
+     */
+    if (err.statusCode === 404 || err.statusCode === 410) {
       await removeSubcription();
-      res.sendStatus(410);
+      res.sendStatus(err.statusCode);
+
+      // TODO: Handle Other HTTP headers:
+      // List of all responses: https://developers.google.com/web/fundamentals/push-notifications/web-push-protocol#everything_together
+      // Too many requests. Meaning your application server has reached a rate limit with a push service. The push service should include a 'Retry-After' header to indicate how long before another request can be made.
+    } else if (err.statusCode === 429) {
+      // TODO: what to do
+      res.sendStatus(500);
     } else {
       console.error(err);
       res.sendStatus(500);

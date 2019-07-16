@@ -1,6 +1,23 @@
+## Setup
+
+```bash
+git clone git@github.com:renarsvilnis/webpush-test.git
+
+# In one terminal window launch client (frontend)
+cd webpush-test/client
+yarn
+yarn start
+
+# In another terminal window launch server (backend)
+cd webpush-test/server
+npm i
+npm start
+```
+
 ## Service Workers
 
 - https://developers.google.com/web/fundamentals/primers/service-workers/lifecycle
+
 
 ## Push Notifications
 

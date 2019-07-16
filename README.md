@@ -1,23 +1,27 @@
 ## Setup
 
 ```bash
+# 1. Clone repo
 git clone git@github.com:renarsvilnis/webpush-test.git
 
+# 2. Start frontend
 # In one terminal window launch client (frontend)
 cd webpush-test/client
 yarn
 yarn start
 
+# 3. Start backend
 # In another terminal window launch server (backend)
 cd webpush-test/server
 npm i
 npm start
+
+# 4. Visit: http://localhost:3000/
 ```
 
 ## Service Workers
 
 - https://developers.google.com/web/fundamentals/primers/service-workers/lifecycle
-
 
 ## Push Notifications
 

@@ -100,8 +100,8 @@ self.addEventListener("push", ev => {
           /**
            * If renotify is true, it must also have a tag
            */
-          renotify: data.renotify | false,
-          requireInteraction: data.requireInteraction | false,
+          renotify: data.renotify || false,
+          requireInteraction: data.requireInteraction || false,
 
           // const supportsActions = 'actions' in Notification.prototype;
           // actions: []
@@ -143,9 +143,7 @@ self.addEventListener("pushsubscriptionchange", ev => {
   ev.waitUntil(
     (async () => {
       try {
-        const pushSubscription = await self.registration.pushManager.subscribe(
-          ev.oldSubscription.options
-        );
+        const pushSubscription = await self.registration.pushManager.subscribe(ev.oldSubscription.options);
         await subscribe(pushSubscription);
       } catch {
         return;
@@ -193,8 +191,7 @@ self.addEventListener("notificationclick", ev => {
        * properties contain url with a trailing slash
        */
       const urlToVisit = addTrailingSlashIfNeeded(
-        (ev.notification.data && ev.notification.data.url) ||
-          ev.srcElement.location.origin
+        (ev.notification.data && ev.notification.data.url) || ev.srcElement.location.origin
       );
       // Alternative way: https://developers.google.com/web/fundamentals/push-notifications/common-notification-patterns#focus_an_existing_window
       // const urlToOpen = new URL(examplePage, self.location.origin).href;
